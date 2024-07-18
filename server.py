@@ -8,8 +8,7 @@ from email import encoders
 import base64
 
 app = Flask(__name__)
-CORS(app)
-#test
+CORS(app, resources={r"/*": {"origins": "http://localhost:4200"}})
 @app.route('/sendEmail', methods=['POST'])
 def send_email():
     try:
