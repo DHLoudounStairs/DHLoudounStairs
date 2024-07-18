@@ -6,9 +6,11 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 import base64
+import traceback
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "http://localhost:4200"}})
+CORS(app)  # This will enable CORS for all origins by default
+
 @app.route('/sendEmail', methods=['POST'])
 def send_email():
     try:
@@ -18,9 +20,16 @@ def send_email():
         file_name = request.form.get('fileName')
         file_content = request.form.get('fileContent')
         hardcoded_recipient = request.form.get('hardcodedRecipient')
-        
+
         # Decode the base64 file content
-        file_data = base64.b64decode(file_content)
+        if file_content:
+            # Add padding if necessary
+            missing_padding = len(file_content) % 4
+            if missing_padding:
+                file_content += '=' * (4 - missing_padding)
+            file_data = base64.b64decode(file_content)
+        else:
+            raise ValueError("No file content provided")
 
         # Create the email
         msg = MIMEMultipart()
@@ -46,8 +55,10 @@ def send_email():
         return jsonify({'message': 'Email sent successfully!'}), 200
 
     except Exception as e:
+        # Print the traceback for the exception
+        print(f"Error: {str(e)}")
+        print(traceback.format_exc())  # Print the full traceback
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run()
-
