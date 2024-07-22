@@ -1,0 +1,6 @@
+# Ignore Google Cloud credentials
+installer-app-8681b-firebase-adminsdk-mhoca-3223d7bd62.json
+google_credentials.json
+
+# Ignore environment variables file
+.env
