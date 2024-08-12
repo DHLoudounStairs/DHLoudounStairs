@@ -123,6 +123,8 @@ def check_files_and_send_emails():
         logging.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
+
+
 def send_email_function(email, subject, body, file_name, file_content, hardcoded_recipient):
     try:
         logging.info(f"Preparing to send email to {hardcoded_recipient} with subject {subject} and file {file_name}")
@@ -149,6 +151,36 @@ def send_email_function(email, subject, body, file_name, file_content, hardcoded
     except Exception as e:
         logging.error(f"Error sending email: {str(e)}")
         logging.error(traceback.format_exc())
+
+@app.route('/sendWelcomeEmail', methods=['POST'])
+def send_welcome_email():
+    try:
+        email = request.json.get('email')
+        temporary_password = request.json.get('temporary_password')
+        company_name = request.json.get("companyName")
+        subject = "Welcome to Our Service"
+        body = f"Dear user,\n\nWelcome to our service! Your temporary password is: {temporary_password}\n\nPlease change your password after logging in.\n\nBest regards,\n{company_name}"
+
+        # Create the email
+        msg = MIMEMultipart()
+        msg['From'] = 'ls.paperless@zohomail.com'
+        msg['To'] = email
+        msg['Subject'] = subject
+
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Send the email
+        with smtplib.SMTP_SSL('smtp.zoho.com', 465) as server:
+            server.login('ls.paperless@zohomail.com', os.getenv('ZOHO_MAIL_PASSWORD'))
+            server.sendmail('ls.paperless@zohomail.com', email, msg.as_string())
+
+        logging.info(f'Welcome email sent to {email}')
+        return jsonify({'message': 'Welcome email sent successfully!'}), 200
+
+    except Exception as e:
+        logging.error(f"Error: {str(e)}")
+        logging.error(traceback.format_exc())  # Print the full traceback
+        return jsonify({'error': str(e)}), 500
 
 def scheduled_job():
     logging.info("Scheduled job running.")
