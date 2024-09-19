@@ -96,24 +96,37 @@ def check_files_and_send_emails():
             parts = blob.name.split('/')
             logging.info(f"Parts after split: {parts}")
 
-            if len(parts) == 3 and today_str in parts[1]:
-                logging.info(f"File found with today's date: {blob.name}")
-                email, date_order_part, file_name = parts
-                logging.info(f"Parsed email: {email}, date_order_part: {date_order_part}, file_name: {file_name}")
+            # Expecting a structure like: '2.0/{email}/{folder_type}/{date_order}/{file}'
+            if len(parts) == 5 and parts[0] == '2.0' and today_str in parts[3]:
+                email, folder_type, date_order_part, file_name = parts[1], parts[2], parts[3], parts[4]
+                
+                # Determine if it's a repair or install inspection and adjust the subject accordingly
+                if folder_type == 'repairs':
+                    folder_type_upper = 'REPAIR'
+                elif folder_type == 'installinspections':
+                    folder_type_upper = 'INSTALL'
+                else:
+                    folder_type_upper = 'OTHER'
+
+                # Download the file and prepare for email
                 file_data = blob.download_as_bytes()
                 file_content = base64.b64encode(file_data).decode('utf-8')
 
+                # Prepare the email subject with the folder type
+                email_subject = f"You have work scheduled for today! ({folder_type_upper})"
+                email_body = f"Order {file_name} from {folder_type} contains today's date."
+                
                 # Send email to the hardcoded recipient
                 send_email_function(
-                     email,  # Hardcoded recipient
-                    f"You have work scheduled for today!",
-                    f"Order {file_name} contains today's date. ",
+                    email,  # Hardcoded recipient
+                    email_subject,  # Updated subject
+                    email_body,  # Updated body with folder type
                     file_name,
                     file_content,
                     email  # Ensure the email is sent to the hardcoded recipient
                 )
             else:
-                logging.info(f"No match for today's date: {blob.name}")
+                logging.info(f"No match for today's date or invalid path: {blob.name}")
         
         logging.info("Finished checking files and sending emails.")
         return jsonify({'message': 'Emails sent successfully!'}), 200
@@ -122,7 +135,6 @@ def check_files_and_send_emails():
         logging.error(f"Error: {str(e)}")
         logging.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
-
 
 
 def send_email_function(email, subject, body, file_name, file_content, hardcoded_recipient):
@@ -151,6 +163,7 @@ def send_email_function(email, subject, body, file_name, file_content, hardcoded
     except Exception as e:
         logging.error(f"Error sending email: {str(e)}")
         logging.error(traceback.format_exc())
+
 
 @app.route('/sendWelcomeEmail', methods=['POST'])
 def send_welcome_email():
