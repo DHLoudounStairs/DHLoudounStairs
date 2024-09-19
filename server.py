@@ -90,51 +90,69 @@ def check_files_and_send_emails():
         logging.info(f"Today's date string: {today_str}")
         
         blobs = bucket.list_blobs()
+        
+        emails_sent = []  # List to store emails that were sent
 
         for blob in blobs:
             logging.info(f"Checking blob: {blob.name}")
             parts = blob.name.split('/')
             logging.info(f"Parts after split: {parts}")
 
-            # Expecting the structure: '2.0/{email}/{folder_type}/{orderNumber_date}/{pdf}'
-            if len(parts) == 5 and parts[0] == '2.0' and today_str in parts[3]:
-                email, folder_type, order_date_part, file_name = parts[1], parts[2], parts[3], parts[4]
+            # Check if the structure starts with '2.0' and has enough parts to parse (like email/folder/file)
+            if len(parts) >= 4 and parts[0] == '2.0':  # Ensure the base folder is '2.0'
+                email, folder_type, order_number_date = parts[1], parts[2], parts[3]
                 
-                # Determine if it's a repair or install inspection and adjust the subject accordingly
-                if folder_type == 'repairs':
-                    folder_type_upper = 'REPAIR'
-                elif folder_type == 'installinspections':
-                    folder_type_upper = 'INSTALL'
+                logging.info(f"Extracted email: {email}, folder_type: {folder_type}, order_number_date: {order_number_date}")
+                
+                # Check if folder_type matches 'repairs' or 'installinspections'
+                if folder_type not in ['repairs', 'installinspections']:
+                    logging.info(f"Skipping non-matching folder type: {folder_type}")
+                    continue
+                
+                # Extract the order date part from the filename (assuming format like '24-07-01_order.pdf')
+                order_date = order_number_date.split('_')[0]
+                logging.info(f"Extracted order date: {order_date}")
+                
+                # Check if the date in the order matches today's date
+                if today_str == order_date:
+                    folder_type_upper = folder_type.upper()  # Capitalize the folder type for email
+                    
+                    # Download the file content and encode it for email
+                    file_data = blob.download_as_bytes()
+                    file_content = base64.b64encode(file_data).decode('utf-8')
+
+                    # Prepare the email subject and body
+                    email_subject = f"You have work scheduled for today! ({folder_type_upper})"
+                    email_body = f"Order {order_number_date} from {folder_type_upper} contains today's date: {order_date}."
+                    
+                    # Send email to the extracted recipient email
+                    send_email_function(
+                        email,  # Send to the email extracted from the path
+                        email_subject,  # Email subject
+                        email_body,  # Email body
+                        order_number_date,  # File name
+                        file_content,
+                        email  # To email address
+                    )
+                    
+                    # Add the email to the list of sent emails
+                    emails_sent.append(email)
                 else:
-                    folder_type_upper = 'OTHER'
-
-                # Download the file and prepare for email
-                file_data = blob.download_as_bytes()
-                file_content = base64.b64encode(file_data).decode('utf-8')
-
-                # Prepare the email subject with the folder type
-                email_subject = f"You have work scheduled for today! ({folder_type_upper})"
-                email_body = f"Order {file_name} from {folder_type_upper} contains today's date: {order_date_part}."
-                
-                # Send email to the hardcoded recipient
-                send_email_function(
-                    email,  # Email sent to the hardcoded recipient
-                    email_subject,  # Updated subject
-                    email_body,  # Updated body with folder type and date
-                    file_name,
-                    file_content,
-                    email  # Hardcoded recipient email
-                )
+                    logging.info(f"No match for today's date: {order_date} != {today_str}")
             else:
-                logging.info(f"No match for today's date or invalid path: {blob.name}")
+                logging.info(f"Skipping blob due to invalid path structure or missing '2.0' directory: {blob.name}")
         
         logging.info("Finished checking files and sending emails.")
-        return jsonify({'message': 'Emails sent successfully!'}), 200
+        
+        # Return the list of emails sent in the response
+        return jsonify({'message': 'Emails sent successfully!', 'emails_sent': emails_sent}), 200
     
     except Exception as e:
         logging.error(f"Error: {str(e)}")
         logging.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
+
+
 # TEST EMAILS IN CONSOLE
 # def send_email_function(email, subject, body, file_name, file_content, hardcoded_recipient):
 #     try:
